@@ -9,7 +9,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from . import MLP, GatedEquiBlock, GateMLP
+from . import MLP, GatedEquiBlock
 
 
 class AvgReadout(nn.Module):
@@ -23,10 +23,10 @@ class AvgReadout(nn.Module):
         with g.local_scope():
             if self.field == "atom":
                 g.ndata["s"] = g.ndata["s"].squeeze(1)
-                output = dgl.readout_nodes(g, "s", op="mean")
+                output = dgl.mean_nodes(g, "s")
             elif self.field == "bond":
                 g.edata["s"] = g.edata["s"].squeeze(1)
-                output = dgl.readout_edges(g, "s", op="mean")
+                output = dgl.mean_edges(g, "s")
             else:
                 raise ValueError(f"field {self.field} not recognized.")
         output = self.mlp(output)
@@ -49,7 +49,6 @@ class ScalarReadout(nn.Module):
 class EquivariantScalarReadout(nn.Module):
     def __init__(self, feat_dim: int):
         super().__init__()
-
         self.out = nn.ModuleList(
             [
                 GatedEquiBlock(feat_dim, feat_dim // 2, True),
@@ -59,17 +58,17 @@ class EquivariantScalarReadout(nn.Module):
 
     def pre_reduce(self, g: dgl.DGLGraph):
         # get atom-wise representation
-        for out in self.out:
-            g.ndata["s"], g.ndata["v"] = out(g.ndata["s"], g.ndata["v"])
+        for o_layer in self.out:
+            g.ndata["s"], g.ndata["v"] = o_layer(g.ndata["s"], g.ndata["v"])
         g.ndata["s"] = g.ndata["s"].squeeze(-1)
         g.ndata["v"] = g.ndata["v"].squeeze(-1)
-
         return g
 
     def atom_aggregate(self, g: dgl.DGLGraph):
         output = (
             dgl.readout_nodes(g, "s", op="sum")
-            + dgl.readout_nodes(g, "v", op="sum").sum(1, keepdim=True) * 0
+            + dgl.readout_nodes(g, "v", op="sum").sum(1, keepdim=True)
+            * 0  # for gradient
         )
         return output
 
@@ -92,7 +91,6 @@ class EquivariantDipoleReadout(EquivariantScalarReadout):
 
     def mol_aggregate(self, g: dgl.DGLGraph):
         with g.local_scope():
-
             g.ndata["atomic_mass"] = self.atomic_mass[g.ndata["node_type"]].view(-1, 1)
             g.ndata["mass"] = g.ndata["atomic_mass"] * g.ndata["pos"]
 
@@ -157,9 +155,7 @@ class EquivariantPolarizabilityReadout(EquivariantScalarReadout):
             g.ndata["atomic_mass"] = self.atomic_mass[g.ndata["node_type"]].view(-1, 1)
             g.ndata["mass"] = g.ndata["atomic_mass"] * g.ndata["pos"]
 
-            mass_center = dgl.readout_nodes(g, "mass", op="sum") / dgl.readout_nodes(
-                g, "atomic_mass", op="sum"
-            )
+            mass_center = dgl.sum_nodes(g, "mass") / dgl.sum_nodes(g, "atomic_mass")
             batch_n_nodes = g.batch_num_nodes()
             indices = torch.arange(g.batch_size, device=g.device).repeat_interleave(
                 batch_n_nodes
@@ -180,7 +176,7 @@ class EquivariantPolarizabilityReadout(EquivariantScalarReadout):
                 + alpha.transpose(-1, -2)
             )
 
-            output = dgl.readout_nodes(g, "alpha", op="sum")
+            output = dgl.sum_nodes(g, "alpha")
 
         return output
 

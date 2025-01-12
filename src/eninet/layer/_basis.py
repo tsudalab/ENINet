@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
-from data.data_config import DEFAULT_FLOATDTYPE
 from torch import Tensor
+
+from data.data_config import DEFAULT_FLOATDTYPE
 
 
 class GaussianRBF(torch.nn.Module):

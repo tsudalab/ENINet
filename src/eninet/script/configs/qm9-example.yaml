@@ -1,0 +1,36 @@
+data:
+  split_seed: 1
+  task: H 
+  cutoff: 5.0
+  train_batch: 64
+  infer_batch: 128
+  n_workers: 23
+  extensive: True
+  file_savedir: ../tmp/graph_cache
+  label_norm: True
+  train_size: 110000
+  val_size: 10000
+  test_size: null
+  max_neigh: 32
+
+model:
+  g_feat_dim: 256 # 64, 128
+  lg_feat_dim: 4
+  n_rbf: 50
+  use_linegraph: True
+  g_aggregation: mean
+  lg_aggregation: mean
+  n_interactions: 6
+  loss_type: mse
+
+train:
+  learning_rate: 0.0001
+  lr_warmup_steps: 10000
+  ema_scale: 1.0
+  reduce_lr_patience: 15
+  reduce_lr_factor: 0.85
+  early_stopping_patience: 100
+  gradient_clip_val: null
+  max_epoch: 1000
+  wandb_log: False
+  cuda: 0

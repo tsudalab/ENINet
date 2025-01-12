@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-
 import dgl
 import dgl.function as fn
 import torch
 import torch.nn as nn
-from data.data_config import DEFAULT_FLOATDTYPE
 from dgl import DGLGraph
-from torch import Tensor
-from torch.nn import functional as F
 
-from .cutoff import CosineCutoff
-from .mlp import MLP, GateMLP
-# from .norm import CoorsNorm
-from .utils import VecLayerNorm as CoorsNorm
+from data.data_config import DEFAULT_FLOATDTYPE
+from layer._cutoff import CosineCutoff
+from layer._mlp import MLP, GateMLP
+from layer._norm import CoorsNorm
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
 
@@ -61,27 +56,22 @@ class TwoBodyEquiGraphConv(torch.nn.Module):
             m.bias.data.fill_(0.0)
 
     def reset_parameters(self):
-
-        nn.init.xavier_uniform_(self.node_neighbors.weight)
-        self.node_neighbors.bias.data.fill_(0.0)
-        nn.init.xavier_uniform_(self.edge_proj.weight)
-        self.edge_proj.bias.data.fill_(0.0)
-
-        nn.init.xavier_uniform_(self.edge_vec.weight)
-        self.edge_vec.bias.data.fill_(0.0)
-
-        nn.init.xavier_uniform_(self.nv_proj.weight)
-        nn.init.xavier_uniform_(self.nv_out.weight)
-
-        nn.init.xavier_uniform_(self.nv_channel.weight)
-        self.nv_channel.bias.data.fill_(0.0)
-
+        layers = [
+            self.node_neighbors,
+            self.edge_proj,
+            self.edge_vec,
+            self.nv_channel,
+            self.nv_proj,
+            self.nv_out,
+        ]
+        for layer in layers:
+            nn.init.xavier_uniform_(layer.weight)
+            if layer.bias is not None:
+                layer.bias.data.fill_(0.0)
         self.ns_proj.apply(self.init_weights)
-
         self.norm_mess.reset_parameters()
 
     def _update_edge_s(self, edges: dgl.udf.EdgeBatch):
-
         # fuse node-edge features
         node_neighbors = self.node_neighbors(
             torch.cat([edges.src["n_s"], edges.dst["n_s"]], dim=-1)
@@ -95,33 +85,32 @@ class TwoBodyEquiGraphConv(torch.nn.Module):
         return {"e_s_upd": es_update}
 
     def _update_edge_v(self, edges: dgl.udf.EdgeBatch):
-
-        node_vec = edges.src["n_v"]
-        edge_vec = edges.data["e_v"]
-        rel_vec = edges.data["vctr_norm"][..., None]
-
         vec_channels = self.edge_vec(edges.data["e_s_upd"])
-
         node_channel, edge_channel, rel_channel = torch.split(
             vec_channels, self.feat_dim, dim=-1
         )
+
         e_v_update = (
-            node_vec * node_channel + edge_vec * edge_channel + rel_vec * rel_channel
+            edges.src["n_v"] * node_channel
+            + edges.data["e_v"] * edge_channel
+            + edges.data["vctr_norm"][..., None] * rel_channel
         )
-        e_v_update = e_v_update * self.cutoff_fn(edges.data["dist"])[..., None]
+        e_v_update *= self.cutoff_fn(edges.data["dist"])[..., None]
 
         return {"e_v_upd": e_v_update}
 
-    def _update_node_v(self, nodes: dgl.udf.EdgeBatch):
+    def _update_node_v(self, nodes: dgl.udf.NodeBatch):
         nv_agg = nodes.data.pop("n_ev")
 
-        nv_o1, nv_o2, nv_o3 = torch.split(self.nv_out(nv_agg), self.feat_dim, -1)
+        nv_out = self.nv_out(nv_agg)
+        nv_o1, nv_o2, nv_o3 = torch.chunk(nv_out, 3, dim=-1)
 
-        v_channel = self.nv_channel(
-            torch.cat(
-                [nodes.data["n_es"], torch.norm(nv_o3, dim=1, keepdim=True)], dim=-1
-            )
-        )
+        n_es = nodes.data["n_es"]
+        nv_o3_norm = torch.norm(nv_o3, dim=1, keepdim=True)
+
+        v_channel_input = torch.cat([n_es, nv_o3_norm], dim=-1)
+        v_channel = self.nv_channel(v_channel_input)
+
         n_v_update = nv_o1 * v_channel + nv_o2
 
         return {"n_v_upd": n_v_update}
@@ -129,10 +118,11 @@ class TwoBodyEquiGraphConv(torch.nn.Module):
     def _update_node_s(self, nodes: dgl.udf.NodeBatch):
         n_es = nodes.data.pop("n_es")
 
-        nv_o1, nv_o2 = torch.split(
-            self.nv_proj(nodes.data["n_v_upd"]), self.feat_dim, -1
-        )
-        ns_o1, ns_o2 = torch.split(self.ns_proj(n_es), self.feat_dim, -1)
+        nv_proj = self.nv_proj(nodes.data["n_v_upd"])
+        ns_proj = self.ns_proj(n_es)
+
+        nv_o1, nv_o2 = nv_proj.chunk(2, dim=-1)
+        ns_o1, ns_o2 = ns_proj.chunk(2, dim=-1)
 
         nv_dot = torch.sum(nv_o1 * nv_o2, dim=1, keepdim=True)
         n_s_update = nv_dot * ns_o1 + ns_o2
@@ -147,44 +137,24 @@ class TwoBodyEquiGraphConv(torch.nn.Module):
         edge_s: torch.Tensor,
         edge_v: torch.Tensor,
     ):
-
         with g.local_scope():
-
-            g.ndata["n_s"] = node_s
-            g.ndata["n_v"] = node_v
-            g.edata["e_s"] = edge_s
-            g.edata["e_v"] = edge_v
+            g.ndata.update({"n_s": node_s, "n_v": node_v})
+            g.edata.update({"e_s": edge_s, "e_v": edge_v})
 
             g.apply_edges(self._update_edge_s)
             g.apply_edges(self._update_edge_v)
 
-            if self.aggregation == "mean":
-                g.update_all(
-                    fn.copy_e("e_v_upd", "e_v_upd"), fn.mean("e_v_upd", "n_ev")
-                )
-                g.update_all(
-                    fn.copy_e("e_s_upd", "e_s_upd"), fn.mean("e_s_upd", "n_es")
-                )
+            agg_fn = fn.mean if self.aggregation == "mean" else fn.sum
+            g.update_all(fn.copy_e("e_v_upd", "e_v_upd"), agg_fn("e_v_upd", "n_ev"))
+            g.update_all(fn.copy_e("e_s_upd", "e_s_upd"), agg_fn("e_s_upd", "n_es"))
 
-            elif self.aggregation == "sum":
-                g.update_all(fn.copy_e("e_v_upd", "e_v_upd"), fn.sum("e_v_upd", "n_ev"))
-                g.update_all(fn.copy_e("e_s_upd", "e_s_upd"), fn.sum("e_s_upd", "n_es"))
-
-            else:
-                raise ValueError(
-                    f"Aggregation method ({self.aggregation}) not implemented."
-                )
-
-            g.apply_nodes(self._update_node_v)  # Use this for E(3)
+            g.apply_nodes(self._update_node_v)
             g.apply_nodes(self._update_node_s)
 
-            node_s = g.ndata.pop("n_s_upd") + node_s
-            node_v = g.ndata.pop("n_v_upd") + node_v
+            node_s = self.norm_mess(g.ndata.pop("n_s_upd") + node_s)
+            node_v = self.norm_nv(g.ndata.pop("n_v_upd") + node_v)
             edge_s = g.edata.pop("e_s_upd") + edge_s
             edge_v = g.edata.pop("e_v_upd") + edge_v
-
-            node_v = self.norm_nv(node_v)
-            node_s = self.norm_mess(node_s)
 
         return node_s, node_v, edge_s, edge_v
 
@@ -228,25 +198,23 @@ class ThreeBodyEquiGraphConvSimple(torch.nn.Module):
             m.bias.data.fill_(0.0)
 
     def reset_parameters(self):
-
+        layers = [
+            self.nv_in,
+            self.edge_neighbors,
+            self.triplet_proj,
+            self.triplet_vec,
+            self.out_nv,
+        ]
         self.ns_in.apply(self.init_weights)
-        nn.init.xavier_uniform_(self.nv_in.weight)
-        nn.init.xavier_uniform_(self.edge_neighbors.weight)
-        self.edge_neighbors.bias.fill_(0.0)
-        nn.init.xavier_uniform_(self.triplet_proj.weight)
-        self.triplet_proj.bias.fill_(0.0)
-        nn.init.xavier_uniform_(self.ev_proj.weight)
+        for layer in layers:
+            nn.init.xavier_uniform_(layer.weight)
+            if layer.bias is not None:
+                layer.bias.fill_(0.0)
         self.norm_mess.reset_parameters()
 
-        self.triplet_vec.bias.fill_(0.0)
-        nn.init.xavier_uniform_(self.triplet_vec.weight)
-        self.out_nv.bias.fill_(0.0)
-        nn.init.xavier_uniform_(self.out_nv.weight)
-
     def _update_edge_s(self, edges: dgl.udf.EdgeBatch):
-        edge_neighbors = self.edge_neighbors(
-            torch.cat([edges.src["n_s"], edges.dst["n_s"]], dim=-1)
-        )
+        node_cat = torch.cat([edges.src["n_s"], edges.dst["n_s"]], dim=-1)
+        edge_neighbors = self.edge_neighbors(node_cat)
         triplet_message = edge_neighbors * self.triplet_proj(edges.data["e_s"])
 
         es_update = (
@@ -257,39 +225,30 @@ class ThreeBodyEquiGraphConvSimple(torch.nn.Module):
         return {"e_s_upd": es_update}
 
     def _update_edge_v(self, edges: dgl.udf.EdgeBatch):
-        triplet_vec = edges.data["e_v"]
-        edge_vec = edges.src["n_v"]
-        rel_vec = edges.data["vctr_norm"][..., None]
-
         vec_channels = self.triplet_vec(edges.data["e_s_upd"])
         triplet_channel, edge_channel, rel_channel = torch.split(
             vec_channels, self.lg_feat_dim, dim=-1
         )
-        ev_update = (
-            triplet_vec * triplet_channel
-            + edge_vec * edge_channel
-            + rel_vec * rel_channel
-        )
 
-        ev_update = ev_update * self.cutoff_fn(edges.data["dist"])[..., None]
+        ev_update = (
+            edges.data["e_v"] * triplet_channel
+            + edges.src["n_v"] * edge_channel
+            + edges.data["vctr_norm"][..., None] * rel_channel
+        )
+        ev_update *= self.cutoff_fn(edges.data["dist"])[..., None]
 
         return {"e_v_upd": ev_update}
 
     def _update_node_v(self, nodes: dgl.udf.NodeBatch):
         n_ev = nodes.data.pop("n_ev")
-
         n_v_update = self.out_nv(n_ev)
-
         return {"n_v_upd": n_v_update}
 
     def _update_node_s(self, nodes: dgl.udf.NodeBatch):
         n_es = nodes.data.pop("n_es")
-
-        n_mess = torch.cat(
-            [n_es, torch.norm(nodes.data["n_v"], dim=1, keepdim=True)], dim=-1
-        )
+        n_v_norm = torch.norm(nodes.data["n_v"], dim=1, keepdim=True)
+        n_mess = torch.cat([n_es, n_v_norm], dim=-1)
         n_s_update = self.out_ns(n_mess)
-
         return {"n_s_upd": n_s_update}
 
     def forward(
@@ -300,13 +259,9 @@ class ThreeBodyEquiGraphConvSimple(torch.nn.Module):
         edge_s: torch.Tensor,
         edge_v: torch.Tensor,
     ):
-
         with g.local_scope():
-
-            g.ndata["n_s"] = self.ns_in(node_s)
-            g.ndata["n_v"] = self.nv_in(node_v)
-            g.edata["e_s"] = edge_s
-            g.edata["e_v"] = edge_v
+            g.ndata.update({"n_s": self.ns_in(node_s), "n_v": self.nv_in(node_v)})
+            g.edata.update({"e_s": edge_s, "e_v": edge_v})
 
             g.apply_edges(self._update_edge_s)
             g.apply_edges(self._update_edge_v)
@@ -317,12 +272,9 @@ class ThreeBodyEquiGraphConvSimple(torch.nn.Module):
             g.apply_nodes(self._update_node_v)
             g.apply_nodes(self._update_node_s)
 
-            node_s = g.ndata.pop("n_s_upd") + node_s
-            node_v = g.ndata.pop("n_v_upd") + node_v
+            node_s = self.norm_mess(g.ndata.pop("n_s_upd") + node_s)
+            node_v = self.norm_nv(g.ndata.pop("n_v_upd") + node_v)
             edge_s = g.edata.pop("e_s_upd") + edge_s
             edge_v = g.edata.pop("e_v_upd") + edge_v
-
-            node_v = self.norm_nv(node_v)
-            node_s = self.norm_mess(node_s)
 
         return node_s, node_v, edge_s, edge_v

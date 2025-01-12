@@ -1,2 +1,1 @@
-src/eninet/layer/__pycache__/
-src/eninet/layer/.mypy_cache/
+src/eninet/**/__pycache__/

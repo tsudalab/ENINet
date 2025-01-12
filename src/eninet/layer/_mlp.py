@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence
 
 import torch
 import torch.nn as nn
 from torch import Tensor
+
+from layer._activation import activation_dict
 
 
 class MLP(torch.nn.Module):
@@ -19,18 +21,19 @@ class MLP(torch.nn.Module):
     ):
         super().__init__()
         activation_kwargs = activation_kwargs or {}
-        self.activation = torch.nn.SiLU if activation == "silu" else None
+        self.activation = activation_dict.get(activation, torch.nn.SiLU)
         self.activate_final = activate_final
         self.w_init = torch.nn.init.xavier_uniform_
         self.b_init = torch.nn.init.zeros_
 
         # Create layers
-        layers = []
-        layers.append(torch.nn.Linear(n_input, hidden_layers[0]))
-        layers.append(self.activation(**activation_kwargs))
+        layers = [
+            torch.nn.Linear(n_input, hidden_layers[0]),
+            self.activation(**activation_kwargs),
+        ]
 
-        for i in range(len(hidden_layers) - 1):
-            layers.append(torch.nn.Linear(hidden_layers[i], hidden_layers[i + 1]))
+        for in_dim, out_dim in zip(hidden_layers[:-1], hidden_layers[1:]):
+            layers.append(torch.nn.Linear(in_dim, out_dim))
             layers.append(self.activation(**activation_kwargs))
 
         layers.append(torch.nn.Linear(hidden_layers[-1], n_output))
@@ -44,8 +47,8 @@ class MLP(torch.nn.Module):
     def reset_parameters(self):
         for layer in self.net:
             if isinstance(layer, torch.nn.Linear):
-                self.w_init(layer.weight.data)
-                self.b_init(layer.bias.data)
+                self.w_init(layer.weight)
+                self.b_init(layer.bias)
 
     def forward(self, x: Tensor) -> Tensor:
         return self.net(x)
@@ -63,28 +66,26 @@ class GateMLP(torch.nn.Module):
     ):
         super().__init__()
         activation_kwargs = activation_kwargs or {}
-        self.activation = torch.nn.SiLU if activation == "silu" else None
+        self.activation = activation_dict.get(activation, torch.nn.SiLU)
         self.activate_final = activate_final
         self.w_init = torch.nn.init.xavier_uniform_
         self.b_init = torch.nn.init.zeros_
 
-        # Create layers
+        # Create layers and gates
         layers = []
         gates = []
-        layers.append(torch.nn.Linear(n_input, hidden_layers[0]))
-        layers.append(self.activation(**activation_kwargs))
-        gates.append(torch.nn.Linear(n_input, hidden_layers[0]))
-        gates.append(self.activation(**activation_kwargs))
+        in_features = n_input
 
-        for i in range(len(hidden_layers) - 1):
-            layers.append(torch.nn.Linear(hidden_layers[i], hidden_layers[i + 1]))
+        for out_features in hidden_layers:
+            layers.append(torch.nn.Linear(in_features, out_features))
             layers.append(self.activation(**activation_kwargs))
-            gates.append(torch.nn.Linear(hidden_layers[i], hidden_layers[i + 1]))
+            gates.append(torch.nn.Linear(in_features, out_features))
             gates.append(self.activation(**activation_kwargs))
+            in_features = out_features
 
-        layers.append(torch.nn.Linear(hidden_layers[-1], n_output))
-        gates.append(torch.nn.Linear(hidden_layers[-1], n_output))
-        gates.append(torch.nn.Sigmoid())
+        layers.append(torch.nn.Linear(in_features, n_output))
+        gates.append(torch.nn.Linear(in_features, n_output))
+        gates.append(self.activation(**activation_kwargs))
 
         if self.activate_final:
             layers.append(self.activation(**activation_kwargs))
@@ -126,11 +127,15 @@ class GatedEquiBlock(torch.nn.Module):
     def reset_parameters(self):
         nn.init.xavier_uniform_(self.linear_v.weight)
 
-    def forward(self, s, v):
+    def forward(
+        self, s: torch.Tensor, v: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         v_W = self.linear_v(v)
         v_U, v_V = torch.chunk(v_W, 2, dim=-1)
 
-        channel_mix = self.mix(torch.cat([s, v_V.norm(dim=1, keepdim=True)], dim=-1))
+        v_V_norm = v_V.norm(dim=1, keepdim=True)
+        s_v_concat = torch.cat([s, v_V_norm], dim=-1)
+        channel_mix = self.mix(s_v_concat)
 
         out_s, v_gate = torch.chunk(channel_mix, 2, dim=-1)
         out_v = v_U * v_gate
