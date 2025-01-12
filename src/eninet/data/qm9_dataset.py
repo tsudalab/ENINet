@@ -65,53 +65,11 @@ class QM9Dataset(DGLDataset):
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+-----------+
     | Cv     | :math:`c_{\textrm{v}}`           | Heat capavity at 298.15K                                                          | :math:`\frac{\textrm{cal}}{\textrm{mol K}}` | Extensive |
     +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+-----------+
-
-    Parameters
-    ----------
-    label_keys : list
-        Names of the regression property, which should be a subset of the keys in the table above.
-    cutoff : float
-        Cutoff distance for interatomic interactions, i.e. two atoms are connected in the corresponding graph if the distance between them is no larger than this.
-        Default: 5.0 Angstrom
-    raw_dir : str
-        Raw file directory to download/contains the input data directory.
-        Default: ~/.dgl/
-    force_reload : bool
-        Whether to reload the dataset. Default: False
-    verbose : bool
-        Whether to print out progress information. Default: True.
-    transform : callable, optional
-        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
-        a transformed version. The :class:`~dgl.DGLGraph` object will be
-        transformed before every access.
-
-    Attributes
-    ----------
-    num_labels : int
-        Number of labels for each graph, i.e. number of prediction tasks
-
-    Raises
-    ------
-    UserWarning
-        If the raw data is changed in the remote server by the author.
-
-    Examples
-    --------
-    >>> data = QM9Dataset(label_keys=['mu', 'gap'], cutoff=5.0)
-    >>> data.num_labels
-    2
-    >>>
-    >>> # iterate over the dataset
-    >>> for g, label in data:
-    ...     R = g.ndata['R'] # get coordinates of each atom
-    ...     Z = g.ndata['Z'] # get atomic numbers of each atom
-    ...     # your code here...
-    >>>
     """
 
     def __init__(
         self,
-        label_key: str,
+        target_name: str,
         converter: Molecule2Graph,
         name: str,
         graph_filename: str,
@@ -123,7 +81,7 @@ class QM9Dataset(DGLDataset):
         transform: callable = None,
     ) -> None:
 
-        self.label_key = label_key
+        self.target_name = target_name
         self._url = _get_dgl_url("dataset/qm9_eV.npz")
         self.converter = converter
         self.graph_filename = graph_filename
@@ -153,7 +111,7 @@ class QM9Dataset(DGLDataset):
         self.N = data_dict["N"]
         self.R = data_dict["R"]
         self.Z = data_dict["Z"]
-        self.labels = torch.tensor(data_dict[self.label_key], dtype=DEFAULT_FLOATDTYPE)[
+        self.labels = torch.tensor(data_dict[self.target_name], dtype=DEFAULT_FLOATDTYPE)[
             :, None
         ]
         # (n_data) -> (n_data, 1)

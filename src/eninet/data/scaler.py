@@ -44,7 +44,11 @@ class StandardScaler(BaseScaler):
     ) -> "StandardScaler":
         if not per_atom:
             n_atoms = 1
-
+        if isinstance(n_atoms, int):
+            n_atoms = torch.tensor([n_atoms] * data.size(0), dtype=data.dtype, device=data.device).view(*data.shape)
+        elif isinstance(n_atoms, Tensor):
+            n_atoms = n_atoms.view(*data.shape)
+            
         mean = torch.mean(data.detach() / n_atoms, dim=0, keepdim=True)
         std = torch.std(data.detach() / n_atoms, dim=0, keepdim=True)
 
@@ -65,6 +69,11 @@ class RemoveMeanScaler(BaseScaler):
     ) -> "RemoveMeanScaler":
         if not per_atom:
             n_atoms = 1
+        if isinstance(n_atoms, int):
+            n_atoms = torch.tensor([n_atoms] * data.size(0), dtype=data.dtype, device=data.device).view(*data.shape)
+        elif isinstance(n_atoms, Tensor):
+            n_atoms = n_atoms.view(*data.shape)
+            
         mean = torch.mean(data / n_atoms, dim=0, keepdim=True)
         return cls(mean, per_atom)
 

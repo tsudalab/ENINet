@@ -451,12 +451,15 @@ class PESModule(BaseTrainModule):
     ) -> Dict[str, Tensor]:
         if self.cal_grad:
             atoms_graph.ndata["pos"].requires_grad_(True)
+            
         atoms_graph = self.conv_layers(atoms_graph, line_graph)
         atoms_graph = self.readout.pre_reduce(atoms_graph)
         atoms_graph.ndata["s"] = self.scaler.inv_transform(atoms_graph.ndata["s"])
+
         output_E = self.readout.atom_aggregate(atoms_graph)
         pos = atoms_graph.ndata["pos"]
         grad_outputs = torch.ones_like(output_E)
+
         grad = torch.autograd.grad(
             outputs=output_E,
             inputs=pos,
@@ -464,5 +467,7 @@ class PESModule(BaseTrainModule):
             create_graph=True,
             retain_graph=True,
         )[0]
-        output_F = -grad if grad is not None else torch.zeros_like(pos)
+
+        output_F = -grad if grad is not None else torch.zeros_like(pos) 
+
         return {"E": output_E, "F": output_F}

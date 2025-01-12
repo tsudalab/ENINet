@@ -1,0 +1,42 @@
+data:
+  split_seed: 1
+  task: aspirin # aspirin, benzene2017, ethanol, malonaldehyde, naphthalene, salicylic, toluene, uracil
+  cutoff: 5.0
+  train_batch: 1
+  infer_batch: 128
+  n_workers: 1
+  extensive: True
+  file_savedir: ../tmp/graph_cache
+  label_norm: True
+  train_size: 50
+  val_size: 50
+  test_size: null
+  max_neigh: 32
+
+model:
+  g_feat_dim: 256
+  lg_feat_dim: 4
+  n_rbf: 50
+  use_linegraph: True
+  g_aggregation: mean
+  lg_aggregation: mean
+  n_interactions: 6
+  loss_type: mse
+  loss_energy_weight: 0.05
+  loss_force_weight: 0.95
+  loss_per_atom_energy: False
+  cal_grad: True
+
+train:
+  project_name: md17-example
+  learning_rate: 0.0001
+  lr_warmup_steps: 1000
+  ema_scale_y: 0.05
+  ema_scale_dy: 1.0
+  reduce_lr_patience: 30
+  reduce_lr_factor: 0.8
+  early_stopping_patience: 1000
+  gradient_clip_val: null
+  max_epoch: 2000
+  wandb_log: False
+  cuda: 0

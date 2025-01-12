@@ -1,19 +1,13 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional
 
 import ase
 import dgl
-import dgl.function as F
 import numpy as np
 import torch
 from ase import Atoms
-from ase.data import atomic_numbers
 from ase.neighborlist import neighbor_list
-from pymatgen.core import Element, Molecule, Structure
-from pymatgen.optimization.neighbors import find_points_in_spheres
-from pymatgen.util.testing import PymatgenTest
 
 from data.data_config import DEFAULT_FLOATDTYPE, DEFAULT_INTDTYPE
 

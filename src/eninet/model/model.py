@@ -151,6 +151,7 @@ class EquiThreeBody(torch.nn.Module):
                 edge_s, edge_v, triplet_s, triplet_v = self.threebody_conv[i](
                     l_g, edge_s, edge_v, triplet_s, triplet_v
                 )
+
             node_s, node_v, edge_s, edge_v = self.twobody_conv[i](
                 g, node_s, node_v, edge_s, edge_v
             )

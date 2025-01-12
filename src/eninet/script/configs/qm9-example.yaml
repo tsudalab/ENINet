@@ -14,7 +14,7 @@ data:
   max_neigh: 32
 
 model:
-  g_feat_dim: 256 # 64, 128
+  g_feat_dim: 256
   lg_feat_dim: 4
   n_rbf: 50
   use_linegraph: True
@@ -24,13 +24,14 @@ model:
   loss_type: mse
 
 train:
+  project_name: qm9-example
   learning_rate: 0.0001
   lr_warmup_steps: 10000
   ema_scale: 1.0
   reduce_lr_patience: 15
   reduce_lr_factor: 0.85
   early_stopping_patience: 100
-  gradient_clip_val: null
+  gradient_clip_val: 1.0
   max_epoch: 1000
   wandb_log: False
   cuda: 0

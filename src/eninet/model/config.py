@@ -31,13 +31,17 @@ class ModelConfig:
     lg_aggregation: str
     n_interactions: int
     loss_type: str
+    loss_energy_weight: float = None
+    loss_force_weight: float = None
+    loss_per_atom_energy: bool = False
+    cal_grad: bool = False
 
 
 @dataclass
 class TrainConfig:
+    project_name: str
     learning_rate: float
     lr_warmup_steps: int
-    ema_scale: float
     reduce_lr_patience: int
     reduce_lr_factor: float
     early_stopping_patience: int
@@ -45,6 +49,9 @@ class TrainConfig:
     max_epoch: int
     wandb_log: bool
     cuda: int
+    ema_scale: float = None
+    ema_scale_y: float = None
+    ema_scale_dy: float = None
 
 
 @dataclass
