@@ -39,26 +39,50 @@ def setup_data(
     dataset_class: DGLDataset, 
     dataset_name: str, 
     scaler_class: BaseScaler,
-    build_linegraph: bool = True
+    build_linegraph: bool = True,
+    structures: list = None,
+    labels: list = None,
     ) -> Tuple[DGLDataset, DGLDataset, DGLDataset, BaseScaler]:
 
-    dataset = dataset_class(   
-        target_name=data_config.task,
-        converter=converter,
-        name=dataset_name,
-        graph_filename=os.path.join(
-            data_config.file_savedir,
-            f"{dataset_name}_graph_cutoff{data_config.cutoff}_{data_config.task}_nmax{data_config.max_neigh}",
-        ),
-        label_filename=os.path.join(
-            data_config.file_savedir,
-            f"{dataset_name}_label_cutoff{data_config.cutoff}_{data_config.task}_nmax{data_config.max_neigh}",
-        ),
-        linegraph_filename=os.path.join(
-            data_config.file_savedir,
-            f"{dataset_name}_linegraph_cutoff{data_config.cutoff}_{data_config.task}_nmax{data_config.max_neigh}"
-        )  if build_linegraph else None,
-    )
+    if dataset_class.__name__ in ["QM9Dataset", "MD17Dataset"]:
+        dataset_init_args = dict(
+            target_name=data_config.task,
+            converter=converter,
+            name=dataset_name,
+            graph_filename=os.path.join(
+                data_config.file_savedir,
+                f"{dataset_name}_graph_cutoff{data_config.cutoff}_{data_config.task}",
+            ),
+            label_filename=os.path.join(
+                data_config.file_savedir,
+                f"{dataset_name}_label_cutoff{data_config.cutoff}_{data_config.task}",
+            ),
+            linegraph_filename=os.path.join(
+                data_config.file_savedir,
+                f"{dataset_name}_linegraph_cutoff{data_config.cutoff}_{data_config.task}"
+            ) if build_linegraph else None,
+        )
+    elif dataset_class.__name__ in ["ASEDataset"]:
+        dataset_init_args = dict(
+            name = dataset_name,
+            atoms = structures,
+            labels = labels,
+            converter = converter,
+            graph_filename=os.path.join(
+                data_config.file_savedir,
+                f"{dataset_name}_graph_cutoff{data_config.cutoff}_{data_config.task}",
+            ),
+            label_filename=os.path.join(
+                data_config.file_savedir,
+                f"{dataset_name}_label_cutoff{data_config.cutoff}_{data_config.task}",
+            ),
+            linegraph_filename=os.path.join(
+                data_config.file_savedir,
+                f"{dataset_name}_linegraph_cutoff{data_config.cutoff}_{data_config.task}"
+            ) if build_linegraph else None,
+        )
+        
+    dataset = dataset_class(**dataset_init_args)
 
     scaler = scaler_class.from_data(
         data=dataset.labels.squeeze() if isinstance(dataset.labels, torch.Tensor) else dataset.labels['E'],

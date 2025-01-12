@@ -10,6 +10,7 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from . import MLP, GatedEquiBlock
+from data.data_config import DEFAULT_FLOATDTYPE
 
 
 class AvgReadout(nn.Module):
@@ -83,7 +84,7 @@ class EquivariantScalarReadout(nn.Module):
 class EquivariantDipoleReadout(EquivariantScalarReadout):
     def __init__(self, feat_dim: int):
         super().__init__(feat_dim)
-        atomic_mass = torch.tensor(ase.data.atomic_masses)
+        atomic_mass = torch.tensor(ase.data.atomic_masses, dtype=DEFAULT_FLOATDTYPE)
         self.register_buffer("atomic_mass", atomic_mass)
 
     def atom_aggregate(self, g: dgl.DGLGraph):
@@ -113,7 +114,7 @@ class EquivariantDipoleReadout(EquivariantScalarReadout):
 class EquivariantDipoleVecReadout(EquivariantScalarReadout):
     def __init__(self, feat_dim: int):
         super().__init__(feat_dim)
-        atomic_mass = torch.tensor(ase.data.atomic_masses)
+        atomic_mass = torch.tensor(ase.data.atomic_masses, dtype=DEFAULT_FLOATDTYPE)
         self.register_buffer("atomic_mass", atomic_mass)
 
     def atom_aggregate(self, g: dgl.DGLGraph):
@@ -144,7 +145,7 @@ class EquivariantDipoleVecReadout(EquivariantScalarReadout):
 class EquivariantPolarizabilityReadout(EquivariantScalarReadout):
     def __init__(self, feat_dim: int):
         super().__init__(feat_dim)
-        atomic_mass = torch.tensor(ase.data.atomic_masses)
+        atomic_mass = torch.tensor(ase.data.atomic_masses, dtype=DEFAULT_FLOATDTYPE)
         self.register_buffer("atomic_mass", atomic_mass)
 
     def atom_aggregate(self, g: dgl.DGLGraph):

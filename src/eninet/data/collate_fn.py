@@ -6,7 +6,7 @@ from dgl import DGLGraph
 from torch import Tensor
 
 
-def collate_fn_lg_scalar(
+def collate_fn_lg(
     batch: List[Tuple[DGLGraph, Optional[DGLGraph], Tensor]]
     ) -> Tuple[DGLGraph, DGLGraph, Tensor]:
     """Merge a list of dgl graphs to form a batch."""
@@ -24,7 +24,7 @@ def collate_fn_lg_scalar(
     return g, l_g, labels
 
 
-def collate_fn_g_scalar(
+def collate_fn_g(
     batch: List[Tuple[DGLGraph, Optional[DGLGraph], Tensor]]
     ) -> Tuple[DGLGraph, None, Tensor]:
     """Merge a list of dgl graphs to form a batch."""

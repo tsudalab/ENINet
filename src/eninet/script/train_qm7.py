@@ -3,17 +3,34 @@ import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from torch.utils.data import DataLoader
+import numpy as np
+
+from ase import Atoms
+import json
+from monty.json import MontyDecoder
 
 from data.data_config import DEFAULT_FLOATDTYPE
-from data.qm9_dataset import QM9Dataset
-from data.scaler import StandardScaler
+from data.dataset import ASEDataset
+from data.scaler import DummyScaler
 from data.collate_fn import collate_fn_g, collate_fn_lg
 from graph.converter import Molecule2Graph
 from model.config import load_config
-from model.pl_wrapper import ScalarPredModule
+from model.pl_wrapper import TensorPredModule
 from script.train_utils import parse, setup_wandb, setup_data, setup_model, setup_trainer
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
+
+def alpha_from_info(struct_info):
+    info = list(struct_info)[0].split(",")
+    label = np.zeros((3, 3))
+    label[0, 0] = float(info[3])
+    label[1, 1] = float(info[4])
+    label[2, 2] = float(info[5])
+    label[0, 1], label[1, 0] = float(info[6]), float(info[6])
+    label[0, 2], label[2, 0] = float(info[7]), float(info[7])
+    label[1, 2], label[2, 1] = float(info[8]), float(info[8])
+    return label
+
 
 def main():
     args = parse()
@@ -25,13 +42,29 @@ def main():
     # Setup Converter
     converter = Molecule2Graph(cutoff=config.data.cutoff)
     
+    if config.data.task == 'ccsd':
+        with open("../data/CCSD_daDZ_ASE.json", "r") as f:
+            ccsd_data = json.load(f, cls=MontyDecoder)
+        structures = [Atoms.fromdict(d) for d in ccsd_data]
+        labels = [torch.tensor(alpha_from_info(struct.info), dtype=DEFAULT_FLOATDTYPE) for struct in structures]
+    elif config.data.task == 'dft':
+        with open("../data/B3LYP_daDZ_ASE.json", "r") as f:
+            dft_data = json.load(f, cls=MontyDecoder)
+        structures = [Atoms.fromdict(d) for d in dft_data]
+        labels = [torch.tensor(alpha_from_info(struct.info), dtype=DEFAULT_FLOATDTYPE) for struct in structures]
+    else:
+        raise ValueError(f'Task ({config.data.task}) not supported!')
+
+    
     # Data Setup
     train_data, val_data, test_data, scaler = setup_data(
         data_config=config.data,
         converter=converter,
-        dataset_class=QM9Dataset,
-        dataset_name="qm9",
-        scaler_class=StandardScaler)
+        dataset_class=ASEDataset,
+        dataset_name="qm7",
+        scaler_class=DummyScaler,
+        structures=structures,
+        labels=labels)
 
     collate_fn = collate_fn_lg if config.model.use_linegraph else collate_fn_g
 
@@ -60,7 +93,7 @@ def main():
     # Model Setup
     model = setup_model(
         config,
-        model_class=ScalarPredModule,
+        model_class=TensorPredModule,
         n_elements=len(converter.element_types),
         scaler=scaler,
         cutoff=config.data.cutoff,
@@ -70,14 +103,14 @@ def main():
     # Trainer Setup
     checkpoint_callback = ModelCheckpoint(
         save_top_k=1,
-        monitor="val_mae",
+        monitor="val_rmse_all",
         mode="min",
         dirpath=f"task_{config.data.task}",
-        filename=f"{config.data.task}"+"-{epoch:02d}-{val_mae:.3f}",
+        filename=f"{config.data.task}"+"-{epoch:02d}-{val_rmse_all:.3f}",
     )
 
     earlystopping_callback = EarlyStopping(
-        "val_mae", mode="min", patience=config.train.early_stopping_patience
+        "val_rmse_all", mode="min", patience=config.train.early_stopping_patience
     )
     trainer = setup_trainer(
         config, 

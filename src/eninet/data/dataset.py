@@ -33,6 +33,7 @@ class ASEDataset(DGLDataset):
         ) -> None:
         self.atoms = atoms
         self.labels = torch.stack(labels) if isinstance(labels, list) else labels
+        self.labels = self.labels.to(DEFAULT_FLOATDTYPE)
         self.converter = converter
         self.graph_filename = graph_filename
         self.label_filename = label_filename

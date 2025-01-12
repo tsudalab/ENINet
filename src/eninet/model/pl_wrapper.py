@@ -331,6 +331,7 @@ class TensorPredModule(BaseTrainModule):
     def forward(self, atoms_graph: DGLGraph, line_graph: Optional[DGLGraph]) -> Tensor:
         atoms_graph = self.conv_layers(atoms_graph, line_graph)
         atoms_graph = self.readout.pre_reduce(atoms_graph)
+
         output = self.readout.mol_aggregate(atoms_graph)
         output = self.scaler.inv_transform(output)
         return output
