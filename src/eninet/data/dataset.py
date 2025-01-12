@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 import os
+
 os.environ["DGLBACKEND"] = "pytorch"
 
 from typing import List, Optional, Tuple, Union
-from tqdm import tqdm
 
-from ase import Atoms
-
-import torch
-from torch import Tensor
 import numpy as np
-
+import torch
+from ase import Atoms
 from dgl import DGLGraph
 from dgl.data import DGLDataset
-from dgl.data.utils import download, _get_dgl_url
-from dgl.data.utils import load_graphs, save_graphs
+from dgl.data.utils import _get_dgl_url, download, load_graphs, save_graphs
+from torch import Tensor
+from tqdm import tqdm
 
-from graph.converter import GraphConverter
 from data.data_config import DEFAULT_FLOATDTYPE
+from graph.converter import GraphConverter
+
 
 class ASEDataset(DGLDataset):
     def __init__(
@@ -30,7 +29,7 @@ class ASEDataset(DGLDataset):
         graph_filename: str,
         label_filename: str,
         linegraph_filename: Optional[str] = None,
-        ) -> None:
+    ) -> None:
         self.atoms = atoms
         self.labels = torch.stack(labels) if isinstance(labels, list) else labels
         self.labels = self.labels.to(DEFAULT_FLOATDTYPE)
@@ -40,15 +39,16 @@ class ASEDataset(DGLDataset):
         self.linegraph_filename = linegraph_filename
 
         super().__init__(name=name)
-        
+
     def has_cache(self) -> bool:
         has_graph_cache = os.path.exists(self.graph_filename)
         has_label_cache = os.path.exists(self.label_filename)
-        has_linegraph_cache = os.path.exists(self.linegraph_filename) \
-            if self.linegraph_filename else True
+        has_linegraph_cache = (
+            os.path.exists(self.linegraph_filename) if self.linegraph_filename else True
+        )
 
         return has_graph_cache and has_label_cache and has_linegraph_cache
-        
+
     def process(self) -> None:
         graphs = []
         line_graphs = []
@@ -62,7 +62,7 @@ class ASEDataset(DGLDataset):
 
         self.graphs = graphs
         self.line_graphs = line_graphs
-                
+
         assert len(self.graphs) == len(self.labels)
 
     def save(self) -> None:
@@ -83,6 +83,6 @@ class ASEDataset(DGLDataset):
         if self.linegraph_filename:
             return self.graphs[idx], self.line_graphs[idx], self.labels[idx]
         return self.graphs[idx], None, self.labels[idx]
-    
+
     def __len__(self) -> int:
         return len(self.graphs)

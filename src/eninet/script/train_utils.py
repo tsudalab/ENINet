@@ -1,21 +1,21 @@
-from typing import Tuple
-
 import argparse
 import os
+from typing import Tuple
+
+import pytorch_lightning as pl
+import torch
 import wandb
-from pytorch_lightning.loggers import WandbLogger
 from dgl.data import DGLDataset
 from dgl.data.utils import split_dataset
-import pytorch_lightning as pl
-
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.loggers import WandbLogger
 
-import torch
 from data.scaler import BaseScaler
-from model.config import Config, DataConfig
 from graph.converter import GraphConverter
+from model.config import Config, DataConfig
 from model.pl_wrapper import BaseTrainModule
+
 
 def parse():
     parser = argparse.ArgumentParser()
@@ -33,16 +33,17 @@ def setup_wandb(config: Config):
     wandb_logger.experiment.config.update(config)
     return wandb_logger
 
+
 def setup_data(
-    data_config: DataConfig, 
-    converter: GraphConverter, 
-    dataset_class: DGLDataset, 
-    dataset_name: str, 
+    data_config: DataConfig,
+    converter: GraphConverter,
+    dataset_class: DGLDataset,
+    dataset_name: str,
     scaler_class: BaseScaler,
     build_linegraph: bool = True,
     structures: list = None,
     labels: list = None,
-    ) -> Tuple[DGLDataset, DGLDataset, DGLDataset, BaseScaler]:
+) -> Tuple[DGLDataset, DGLDataset, DGLDataset, BaseScaler]:
 
     if dataset_class.__name__ in ["QM9Dataset", "MD17Dataset"]:
         dataset_init_args = dict(
@@ -57,17 +58,21 @@ def setup_data(
                 data_config.file_savedir,
                 f"{dataset_name}_label_cutoff{data_config.cutoff}_{data_config.task}",
             ),
-            linegraph_filename=os.path.join(
-                data_config.file_savedir,
-                f"{dataset_name}_linegraph_cutoff{data_config.cutoff}_{data_config.task}"
-            ) if build_linegraph else None,
+            linegraph_filename=(
+                os.path.join(
+                    data_config.file_savedir,
+                    f"{dataset_name}_linegraph_cutoff{data_config.cutoff}_{data_config.task}",
+                )
+                if build_linegraph
+                else None
+            ),
         )
     elif dataset_class.__name__ in ["ASEDataset"]:
         dataset_init_args = dict(
-            name = dataset_name,
-            atoms = structures,
-            labels = labels,
-            converter = converter,
+            name=dataset_name,
+            atoms=structures,
+            labels=labels,
+            converter=converter,
             graph_filename=os.path.join(
                 data_config.file_savedir,
                 f"{dataset_name}_graph_cutoff{data_config.cutoff}_{data_config.task}",
@@ -76,16 +81,24 @@ def setup_data(
                 data_config.file_savedir,
                 f"{dataset_name}_label_cutoff{data_config.cutoff}_{data_config.task}",
             ),
-            linegraph_filename=os.path.join(
-                data_config.file_savedir,
-                f"{dataset_name}_linegraph_cutoff{data_config.cutoff}_{data_config.task}"
-            ) if build_linegraph else None,
+            linegraph_filename=(
+                os.path.join(
+                    data_config.file_savedir,
+                    f"{dataset_name}_linegraph_cutoff{data_config.cutoff}_{data_config.task}",
+                )
+                if build_linegraph
+                else None
+            ),
         )
-        
+
     dataset = dataset_class(**dataset_init_args)
 
     scaler = scaler_class.from_data(
-        data=dataset.labels.squeeze() if isinstance(dataset.labels, torch.Tensor) else dataset.labels['E'],
+        data=(
+            dataset.labels.squeeze()
+            if isinstance(dataset.labels, torch.Tensor)
+            else dataset.labels["E"]
+        ),
         n_atoms=torch.tensor([g.num_nodes() for g in dataset.graphs]),
         per_atom=data_config.extensive,
     )
@@ -112,13 +125,13 @@ def setup_data(
 
 
 def setup_model(
-    config: Config, 
-    model_class: BaseTrainModule, 
-    n_elements: int, 
-    scaler: BaseScaler, 
-    cutoff: float, 
-    is_extensive: bool
-    ) -> BaseTrainModule:
+    config: Config,
+    model_class: BaseTrainModule,
+    n_elements: int,
+    scaler: BaseScaler,
+    cutoff: float,
+    is_extensive: bool,
+) -> BaseTrainModule:
     """Sets up the model with its configuration."""
     model = model_class(
         n_elements=n_elements,
@@ -132,13 +145,14 @@ def setup_model(
 
 
 def setup_trainer(
-    config: Config, 
-    wandb_logger, 
-    checkpoint_callback: ModelCheckpoint, 
+    config: Config,
+    wandb_logger,
+    checkpoint_callback: ModelCheckpoint,
     earlystopping_callback: EarlyStopping,
-    infer_mode: bool = True):
+    infer_mode: bool = True,
+):
     """Sets up the PyTorch Lightning trainer."""
-    
+
     trainer = pl.Trainer(
         max_epochs=config.train.max_epoch,
         accelerator="gpu",

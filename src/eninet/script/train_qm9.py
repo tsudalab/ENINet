@@ -1,19 +1,25 @@
 import torch
-
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from torch.utils.data import DataLoader
 
+from data.collate_fn import collate_fn_g, collate_fn_lg
 from data.data_config import DEFAULT_FLOATDTYPE
 from data.qm9_dataset import QM9Dataset
 from data.scaler import StandardScaler
-from data.collate_fn import collate_fn_g, collate_fn_lg
 from graph.converter import Molecule2Graph
 from model.config import load_config
 from model.pl_wrapper import ScalarPredModule
-from script.train_utils import parse, setup_wandb, setup_data, setup_model, setup_trainer
+from script.train_utils import (
+    parse,
+    setup_data,
+    setup_model,
+    setup_trainer,
+    setup_wandb,
+)
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
+
 
 def main():
     args = parse()
@@ -24,14 +30,15 @@ def main():
 
     # Setup Converter
     converter = Molecule2Graph(cutoff=config.data.cutoff)
-    
+
     # Data Setup
     train_data, val_data, test_data, scaler = setup_data(
         data_config=config.data,
         converter=converter,
         dataset_class=QM9Dataset,
         dataset_name="qm9",
-        scaler_class=StandardScaler)
+        scaler_class=StandardScaler,
+    )
 
     collate_fn = collate_fn_lg if config.model.use_linegraph else collate_fn_g
 
@@ -73,18 +80,19 @@ def main():
         monitor="val_mae",
         mode="min",
         dirpath=f"task_{config.data.task}",
-        filename=f"{config.data.task}"+"-{epoch:02d}-{val_mae:.3f}",
+        filename=f"{config.data.task}" + "-{epoch:02d}-{val_mae:.3f}",
     )
 
     earlystopping_callback = EarlyStopping(
         "val_mae", mode="min", patience=config.train.early_stopping_patience
     )
     trainer = setup_trainer(
-        config, 
-        wandb_logger, 
-        checkpoint_callback, 
-        earlystopping_callback, 
-        infer_mode=True)
+        config,
+        wandb_logger,
+        checkpoint_callback,
+        earlystopping_callback,
+        infer_mode=True,
+    )
 
     # Training
     trainer.fit(

@@ -1,24 +1,30 @@
-import torch
+import json
 
+import numpy as np
+import torch
+from ase import Atoms
+from monty.json import MontyDecoder
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from torch.utils.data import DataLoader
-import numpy as np
 
-from ase import Atoms
-import json
-from monty.json import MontyDecoder
-
+from data.collate_fn import collate_fn_g, collate_fn_lg
 from data.data_config import DEFAULT_FLOATDTYPE
 from data.dataset import ASEDataset
 from data.scaler import DummyScaler
-from data.collate_fn import collate_fn_g, collate_fn_lg
 from graph.converter import Molecule2Graph
 from model.config import load_config
 from model.pl_wrapper import TensorPredModule
-from script.train_utils import parse, setup_wandb, setup_data, setup_model, setup_trainer
+from script.train_utils import (
+    parse,
+    setup_data,
+    setup_model,
+    setup_trainer,
+    setup_wandb,
+)
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
+
 
 def alpha_from_info(struct_info):
     info = list(struct_info)[0].split(",")
@@ -41,21 +47,26 @@ def main():
 
     # Setup Converter
     converter = Molecule2Graph(cutoff=config.data.cutoff)
-    
-    if config.data.task == 'ccsd':
+
+    if config.data.task == "ccsd":
         with open("../data/CCSD_daDZ_ASE.json", "r") as f:
             ccsd_data = json.load(f, cls=MontyDecoder)
         structures = [Atoms.fromdict(d) for d in ccsd_data]
-        labels = [torch.tensor(alpha_from_info(struct.info), dtype=DEFAULT_FLOATDTYPE) for struct in structures]
-    elif config.data.task == 'dft':
+        labels = [
+            torch.tensor(alpha_from_info(struct.info), dtype=DEFAULT_FLOATDTYPE)
+            for struct in structures
+        ]
+    elif config.data.task == "dft":
         with open("../data/B3LYP_daDZ_ASE.json", "r") as f:
             dft_data = json.load(f, cls=MontyDecoder)
         structures = [Atoms.fromdict(d) for d in dft_data]
-        labels = [torch.tensor(alpha_from_info(struct.info), dtype=DEFAULT_FLOATDTYPE) for struct in structures]
+        labels = [
+            torch.tensor(alpha_from_info(struct.info), dtype=DEFAULT_FLOATDTYPE)
+            for struct in structures
+        ]
     else:
-        raise ValueError(f'Task ({config.data.task}) not supported!')
+        raise ValueError(f"Task ({config.data.task}) not supported!")
 
-    
     # Data Setup
     train_data, val_data, test_data, scaler = setup_data(
         data_config=config.data,
@@ -64,7 +75,8 @@ def main():
         dataset_name="qm7",
         scaler_class=DummyScaler,
         structures=structures,
-        labels=labels)
+        labels=labels,
+    )
 
     collate_fn = collate_fn_lg if config.model.use_linegraph else collate_fn_g
 
@@ -106,18 +118,19 @@ def main():
         monitor="val_rmse_all",
         mode="min",
         dirpath=f"task_{config.data.task}",
-        filename=f"{config.data.task}"+"-{epoch:02d}-{val_rmse_all:.3f}",
+        filename=f"{config.data.task}" + "-{epoch:02d}-{val_rmse_all:.3f}",
     )
 
     earlystopping_callback = EarlyStopping(
         "val_rmse_all", mode="min", patience=config.train.early_stopping_patience
     )
     trainer = setup_trainer(
-        config, 
-        wandb_logger, 
-        checkpoint_callback, 
-        earlystopping_callback, 
-        infer_mode=True)
+        config,
+        wandb_logger,
+        checkpoint_callback,
+        earlystopping_callback,
+        infer_mode=True,
+    )
 
     # Training
     trainer.fit(

@@ -9,8 +9,9 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from . import MLP, GatedEquiBlock
 from data.data_config import DEFAULT_FLOATDTYPE
+
+from . import MLP, GatedEquiBlock
 
 
 class AvgReadout(nn.Module):

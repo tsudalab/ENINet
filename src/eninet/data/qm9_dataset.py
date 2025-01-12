@@ -111,9 +111,9 @@ class QM9Dataset(DGLDataset):
         self.N = data_dict["N"]
         self.R = data_dict["R"]
         self.Z = data_dict["Z"]
-        self.labels = torch.tensor(data_dict[self.target_name], dtype=DEFAULT_FLOATDTYPE)[
-            :, None
-        ]
+        self.labels = torch.tensor(
+            data_dict[self.target_name], dtype=DEFAULT_FLOATDTYPE
+        )[:, None]
         # (n_data) -> (n_data, 1)
 
         self.N_cumsum = np.concatenate([[0], np.cumsum(self.N)])

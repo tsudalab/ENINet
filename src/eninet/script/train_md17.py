@@ -1,16 +1,22 @@
 import torch
-from torch.utils.data import DataLoader
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from torch.utils.data import DataLoader
 
 from data.collate_fn import collate_fn_g_pes, collate_fn_lg_pes
+from data.data_config import DEFAULT_FLOATDTYPE
+from data.md17_dataset import MD17Dataset
+from data.scaler import StandardScaler
 from graph.converter import Molecule2Graph
 from model.config import load_config
 from model.pl_wrapper import PESModule
-from data.md17_dataset import MD17Dataset
-from data.scaler import StandardScaler
-from data.data_config import DEFAULT_FLOATDTYPE
-from script.train_utils import parse, setup_wandb, setup_data, setup_model, setup_trainer
+from script.train_utils import (
+    parse,
+    setup_data,
+    setup_model,
+    setup_trainer,
+    setup_wandb,
+)
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
 
@@ -21,10 +27,10 @@ def main():
     print(config)
 
     wandb_logger = setup_wandb(config)
-    
+
     # Setup Converter
     converter = Molecule2Graph(cutoff=config.data.cutoff)
-    
+
     # Data Setup
     train_data, val_data, test_data, scaler = setup_data(
         data_config=config.data,
@@ -32,8 +38,9 @@ def main():
         dataset_class=MD17Dataset,
         dataset_name="md17",
         scaler_class=StandardScaler,
-        build_linegraph=False)
-    
+        build_linegraph=False,
+    )
+
     collate_fn = collate_fn_lg_pes if config.model.use_linegraph else collate_fn_g_pes
 
     train_loader = DataLoader(
@@ -74,18 +81,19 @@ def main():
         monitor="val_loss",
         mode="min",
         dirpath=f"task_{config.data.task}",
-        filename=f"{config.data.task}"+"-{epoch:02d}-{val_mae:.3f}",
+        filename=f"{config.data.task}" + "-{epoch:02d}-{val_mae:.3f}",
     )
 
     earlystopping_callback = EarlyStopping(
         "val_loss", mode="min", patience=config.train.early_stopping_patience
     )
     trainer = setup_trainer(
-        config, 
+        config,
         wandb_logger,
         checkpoint_callback,
         earlystopping_callback,
-        infer_mode=False)
+        infer_mode=False,
+    )
 
     trainer.fit(
         model=model,
@@ -93,7 +101,8 @@ def main():
         val_dataloaders=val_loader,
     )
 
-    trainer.test(model, dataloaders=test_loader, ckpt_path='best')
+    trainer.test(model, dataloaders=test_loader, ckpt_path="best")
+
 
 if __name__ == "__main__":
     main()
