@@ -34,6 +34,12 @@ cd ENINet
 pip install -e .
 ```
 
+You can test the installation by running the following command:
+
+```python
+python tests/test_equivariance.py
+```
+
 ## Run Experiments
 
 This repository provides code for training on benchmark datasets, including QM9, MD17, and QM7b polarizabilities. To run the training yourself, follow these steps:
