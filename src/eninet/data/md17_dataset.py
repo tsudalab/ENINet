@@ -8,16 +8,16 @@ import os
 from abc import ABCMeta, abstractmethod
 from typing import Dict, Tuple
 
-import dgl
 import numpy as np
-import torch
 from ase import Atoms
-from dgl.data import DGLDataset
-from dgl.data.utils import download, load_graphs, save_graphs
 from tqdm import tqdm
 
-from data.data_config import DEFAULT_FLOATDTYPE
-from graph.converter import Molecule2Graph
+import torch
+from dgl.data import DGLDataset
+from dgl.data.utils import download, load_graphs, save_graphs
+
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
+from eninet.graph.converter import Molecule2Graph
 
 
 class MD17DatasetBase(DGLDataset, metaclass=ABCMeta):

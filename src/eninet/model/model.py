@@ -4,12 +4,8 @@ import torch
 import torch.nn as nn
 from dgl import DGLGraph
 
-from layer import (
-    CosineCutoff,
-    GaussianRBF,
-    ThreeBodyEquiGraphConvSimple,
-    TwoBodyEquiGraphConv,
-)
+from eninet.layer import (CosineCutoff, GaussianRBF, ThreeBodyEquiGraphConvSimple,
+                   TwoBodyEquiGraphConv)
 
 
 class EquiThreeBody(torch.nn.Module):

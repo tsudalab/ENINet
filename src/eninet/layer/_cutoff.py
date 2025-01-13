@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from data.data_config import DEFAULT_FLOATDTYPE
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
 
 
 class CosineCutoff(torch.nn.Module):

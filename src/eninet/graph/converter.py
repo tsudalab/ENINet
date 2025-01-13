@@ -9,7 +9,7 @@ import torch
 from ase import Atoms
 from ase.neighborlist import neighbor_list
 
-from data.data_config import DEFAULT_FLOATDTYPE, DEFAULT_INTDTYPE
+from eninet.data.data_config import DEFAULT_FLOATDTYPE, DEFAULT_INTDTYPE
 
 
 class GraphConverter(metaclass=ABCMeta):

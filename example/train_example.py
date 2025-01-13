@@ -1,23 +1,34 @@
+import glob
+import os
+
 import torch
-from torch.utils.data import DataLoader
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from torch.utils.data import DataLoader
 
-from eninet.data.collate_fn import collate_fn_g_pes, collate_fn_lg_pes
+from eninet.data.collate_fn import collate_fn_g, collate_fn_lg
 from eninet.data.data_config import DEFAULT_FLOATDTYPE
-from eninet.data.md17_dataset import MD17Dataset
+from eninet.data.dataset import CustomDatase
 from eninet.data.scaler import StandardScaler
 from eninet.graph.converter import Molecule2Graph
 from eninet.model.config import load_config
-from eninet.model.pl_wrapper import PESModule
-from eninet.script.train_utils import (parse, setup_data, setup_model, setup_trainer,
-                                setup_wandb)
-
+from eninet.model.pl_wrapper import ScalarPredModule
+from eninet.script.train_utils import (
+    parse,
+    print_logo,
+    read_dataset_from_json,
+    setup_data,
+    setup_model,
+    setup_trainer,
+    setup_wandb,
+)
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
 
 
 def main():
+    print_logo()
+
     args = parse()
     config = load_config(args.config)
     print(config)
@@ -27,17 +38,20 @@ def main():
     # Setup Converter
     converter = Molecule2Graph(cutoff=config.data.cutoff)
 
+    _, structures, labels = read_dataset_from_json(config.data.dataset_path)
+
     # Data Setup
     train_data, val_data, test_data, scaler = setup_data(
         data_config=config.data,
         converter=converter,
-        dataset_class=MD17Dataset,
-        dataset_name="md17",
+        dataset_class=CustomDatase,
+        dataset_name="example",
         scaler_class=StandardScaler,
-        build_linegraph=False,
+        structures=structures,
+        labels=labels,
     )
 
-    collate_fn = collate_fn_lg_pes if config.model.use_linegraph else collate_fn_g_pes
+    collate_fn = collate_fn_lg if config.model.use_linegraph else collate_fn_g
 
     train_loader = DataLoader(
         train_data,
@@ -64,7 +78,7 @@ def main():
     # Model Setup
     model = setup_model(
         config,
-        model_class=PESModule,
+        model_class=ScalarPredModule,
         n_elements=len(converter.element_types),
         scaler=scaler,
         cutoff=config.data.cutoff,
@@ -72,32 +86,52 @@ def main():
     )
 
     # Trainer Setup
+    checkpoint_dir = f"task_{config.data.task}"
     checkpoint_callback = ModelCheckpoint(
         save_top_k=1,
-        monitor="val_loss",
+        monitor="val_mae",
         mode="min",
-        dirpath=f"task_{config.data.task}",
+        dirpath=checkpoint_dir,
         filename=f"{config.data.task}" + "-{epoch:02d}-{val_mae:.3f}",
     )
 
     earlystopping_callback = EarlyStopping(
-        "val_loss", mode="min", patience=config.train.early_stopping_patience
+        "val_mae", mode="min", patience=config.train.early_stopping_patience
     )
     trainer = setup_trainer(
         config,
         wandb_logger,
         checkpoint_callback,
         earlystopping_callback,
-        infer_mode=False,
+        infer_mode=True,
     )
 
-    trainer.fit(
-        model=model,
-        train_dataloaders=train_loader,
-        val_dataloaders=val_loader,
-    )
+    checkpoint_files = glob.glob(os.path.join(checkpoint_dir, "*.ckpt"))
 
+    if checkpoint_files:
+        checkpoint_files.sort(key=os.path.getmtime, reverse=True)
+        latest_checkpoint = checkpoint_files[0]
+
+        print(f"Checkpoint found: Resuming from {latest_checkpoint}")
+        trainer.fit(
+            model=model,
+            train_dataloaders=train_loader,
+            val_dataloaders=val_loader,
+            ckpt_path=latest_checkpoint,
+        )
+    else:
+        print("No checkpoint found: Starting fresh training")
+        trainer.fit(
+            model=model,
+            train_dataloaders=train_loader,
+            val_dataloaders=val_loader,
+        )
+
+    # Testing
     trainer.test(model, dataloaders=test_loader, ckpt_path="best")
+
+    best_checkpoint_path = checkpoint_callback.best_model_path
+    print(f"Best model saved at: {best_checkpoint_path}")
 
 
 if __name__ == "__main__":

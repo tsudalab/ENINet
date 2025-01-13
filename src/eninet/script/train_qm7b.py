@@ -1,27 +1,25 @@
 import json
 
 import numpy as np
-import torch
-from ase import Atoms
 from monty.json import MontyDecoder
+from ase import Atoms
+
+import torch
+from torch.utils.data import DataLoader
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from torch.utils.data import DataLoader
 
-from data.collate_fn import collate_fn_g, collate_fn_lg
-from data.data_config import DEFAULT_FLOATDTYPE
-from data.dataset import ASEDataset
-from data.scaler import DummyScaler
-from graph.converter import Molecule2Graph
-from model.config import load_config
-from model.pl_wrapper import TensorPredModule
-from script.train_utils import (
-    parse,
-    setup_data,
-    setup_model,
-    setup_trainer,
-    setup_wandb,
-)
+from eninet.data.collate_fn import collate_fn_g, collate_fn_lg
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
+from eninet.data.dataset import CustomDatase
+from eninet.data.scaler import DummyScaler
+from eninet.graph.converter import Molecule2Graph
+from eninet.model.config import load_config
+from eninet.model.pl_wrapper import TensorPredModule
+
+from eninet.script.train_utils import (parse, setup_data, setup_model, setup_trainer,
+                                setup_wandb)
+
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
 
@@ -71,7 +69,7 @@ def main():
     train_data, val_data, test_data, scaler = setup_data(
         data_config=config.data,
         converter=converter,
-        dataset_class=ASEDataset,
+        dataset_class=CustomDatase,
         dataset_name="qm7",
         scaler_class=DummyScaler,
         structures=structures,

@@ -1,0 +1,39 @@
+# Configuration file for ENINet training script
+
+data:
+  split_seed: 1  # Seed for data splitting
+  task: task-example  # Task identifier for the dataset
+  cutoff: 4.0  # Cutoff distance for neighbor search
+  train_batch: 10  # Batch size for training
+  infer_batch: 10  # Batch size for inference
+  n_workers: 1  # Number of workers for data loading
+  extensive: True  # Flag indicating whether the dataset is extensive
+  file_savedir: ../tmp/graph_cache  # Directory to save cached graph data
+  train_size: 0.8  # Proportion or number of data used for training
+  val_size: 0.1  # Proportion or number of data used for validation
+  test_size: null  # Proportion or number of data used for testing (null means the remainder)
+  max_neigh: 32  # Maximum number of neighbors considered
+  dataset_path: assets/qm9-train-example.json # Path to the custom dataset file
+
+model:
+  g_feat_dim: 64  # Feature dimension for the graph
+  lg_feat_dim: 1  # Feature dimension for the line graph
+  n_rbf: 20  # Number of radial basis functions
+  use_linegraph: True  # Flag indicating whether to use line graph
+  g_aggregation: mean  # Aggregation method for graph features
+  lg_aggregation: mean  # Aggregation method for line graph features
+  n_interactions: 3  # Number of interaction layers
+  loss_type: mse  # Loss function type
+
+train:
+  project_name: qm9-example  # Project name for logging and tracking
+  learning_rate: 0.0001  # Initial learning rate
+  lr_warmup_steps: 10  # Number of steps for learning rate warmup
+  ema_scale: 1.0  # Exponential moving average scale
+  reduce_lr_patience: 15  # Patience for reducing learning rate on plateau
+  reduce_lr_factor: 0.85  # Factor by which to reduce learning rate
+  early_stopping_patience: 100  # Patience for early stopping
+  gradient_clip_val: 1.0  # Maximum value for gradient clipping
+  max_epoch: 100  # Maximum number of training epochs
+  wandb_log: False  # Flag indicating whether to log with Weights & Biases
+  cuda: 0  # CUDA device index for training (0 for the first GPU)

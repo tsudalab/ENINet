@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import dgl
-import dgl.function as fn
 import torch
 import torch.nn as nn
+import dgl
+import dgl.function as fn
 from dgl import DGLGraph
 
-from data.data_config import DEFAULT_FLOATDTYPE
-from layer._cutoff import CosineCutoff
-from layer._mlp import MLP, GateMLP
-from layer._norm import CoorsNorm
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
+from eninet.layer._cutoff import CosineCutoff
+from eninet.layer._mlp import MLP, GateMLP
+from eninet.layer._norm import CoorsNorm
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
 

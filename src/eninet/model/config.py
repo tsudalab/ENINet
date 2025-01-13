@@ -14,11 +14,11 @@ class DataConfig:
     n_workers: int
     extensive: bool
     file_savedir: str
-    label_norm: bool
     train_size: int
     val_size: int
     test_size: Optional[int]
     max_neigh: int
+    dataset_path: str = None
 
 
 @dataclass

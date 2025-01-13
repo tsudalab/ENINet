@@ -6,8 +6,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from layer._activation import activation_dict
-
+from eninet.layer._activation import activation_dict
 
 class MLP(torch.nn.Module):
     def __init__(

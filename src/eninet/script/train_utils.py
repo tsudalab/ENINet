@@ -1,25 +1,35 @@
 import argparse
+import json
 import os
-from typing import Tuple
+from typing import List, Tuple, Union
+import wandb
+from ase import Atoms
+from monty.json import MontyDecoder
 
 import pytorch_lightning as pl
 import torch
-import wandb
-from dgl.data import DGLDataset
-from dgl.data.utils import split_dataset
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
+from dgl.data import DGLDataset
+from dgl.data.utils import split_dataset
 
-from data.scaler import BaseScaler
-from graph.converter import GraphConverter
-from model.config import Config, DataConfig
-from model.pl_wrapper import BaseTrainModule
+from eninet.data.scaler import BaseScaler
+from eninet.graph.converter import GraphConverter
+from eninet.model.config import Config, DataConfig
+from eninet.model.pl_wrapper import BaseTrainModule
+
 
 
 def parse():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, help="Path to the configuration file")
+    parser.add_argument(
+        "--ckpt", type=str, help="Path to the checkpoint file", default=None
+    )
+    parser.add_argument(
+        "--infer", type=str, help="Path to the inference dataset", default=None
+    )
     args = parser.parse_args()
     return args
 
@@ -43,7 +53,9 @@ def setup_data(
     build_linegraph: bool = True,
     structures: list = None,
     labels: list = None,
+    infer_mode: bool = False,
 ) -> Tuple[DGLDataset, DGLDataset, DGLDataset, BaseScaler]:
+    # if infer_mode, return only the scaler for inference
 
     if dataset_class.__name__ in ["QM9Dataset", "MD17Dataset"]:
         dataset_init_args = dict(
@@ -67,7 +79,7 @@ def setup_data(
                 else None
             ),
         )
-    elif dataset_class.__name__ in ["ASEDataset"]:
+    elif dataset_class.__name__ in ["CustomDatase"]:
         dataset_init_args = dict(
             name=dataset_name,
             atoms=structures,
@@ -103,25 +115,28 @@ def setup_data(
         per_atom=data_config.extensive,
     )
 
-    train_ratio = (
-        data_config.train_size
-        if isinstance(data_config.train_size, float)
-        else data_config.train_size / len(dataset)
-    )
-    val_ratio = (
-        data_config.val_size
-        if isinstance(data_config.val_size, float)
-        else data_config.val_size / len(dataset)
-    )
+    if not infer_mode:
+        train_ratio = (
+            data_config.train_size
+            if isinstance(data_config.train_size, float)
+            else data_config.train_size / len(dataset)
+        )
+        val_ratio = (
+            data_config.val_size
+            if isinstance(data_config.val_size, float)
+            else data_config.val_size / len(dataset)
+        )
 
-    train_data, val_data, test_data = split_dataset(
-        dataset,
-        frac_list=[train_ratio, val_ratio, 1 - train_ratio - val_ratio],
-        shuffle=True,
-        random_state=data_config.split_seed,
-    )
+        train_data, val_data, test_data = split_dataset(
+            dataset,
+            frac_list=[train_ratio, val_ratio, 1 - train_ratio - val_ratio],
+            shuffle=True,
+            random_state=data_config.split_seed,
+        )
 
-    return train_data, val_data, test_data, scaler
+        return train_data, val_data, test_data, scaler
+
+    return scaler
 
 
 def setup_model(
@@ -163,3 +178,41 @@ def setup_trainer(
         inference_mode=infer_mode,
     )
     return trainer
+
+
+def read_dataset_from_json(
+    json_filename: str, infer_mode: bool = False
+) -> Union[Tuple[List, List], List]:
+    with open(json_filename, "r") as f:
+        dataset = json.load(f, cls=MontyDecoder)
+
+    structures = []
+    labels = []
+    mol_ids = []
+
+    for mol_id, data in dataset.items():
+        structure = Atoms.fromdict(data["structure"])
+        structures.append(structure)
+        mol_ids.append(mol_id)
+
+        if infer_mode:
+            continue
+
+        label = data["label"]
+        labels.append([label])
+
+    if infer_mode:
+        return mol_ids, structures
+
+    return mol_ids, structures, labels
+
+
+def print_logo():
+    logo = """
+   _____  _______  __    __ 
+  / __/ |/ /  _/ |/ /__ / /_
+ / _//    // //    / -_) __/
+/___/_/|_/___/_/|_/\__/\__/ 
+                            
+    """
+    print(logo)

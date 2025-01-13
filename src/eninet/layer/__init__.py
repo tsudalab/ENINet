@@ -4,12 +4,8 @@ from ._conv import ThreeBodyEquiGraphConvSimple, TwoBodyEquiGraphConv
 from ._cutoff import CosineCutoff
 from ._mlp import MLP, GatedEquiBlock, GateMLP
 from ._norm import CoorsNorm
-from ._readout import (
-    AvgReadout,
-    EquivariantDipoleReadout,
-    EquivariantDipoleVecReadout,
-    EquivariantElectronicSpatialExtent,
-    EquivariantPolarizabilityReadout,
-    EquivariantScalarReadout,
-    ScalarReadout,
-)
+from ._readout import (AvgReadout, EquivariantDipoleReadout,
+                       EquivariantDipoleVecReadout,
+                       EquivariantElectronicSpatialExtent,
+                       EquivariantPolarizabilityReadout,
+                       EquivariantScalarReadout, ScalarReadout)

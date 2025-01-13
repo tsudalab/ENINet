@@ -1,22 +1,17 @@
 import torch
+from torch.utils.data import DataLoader
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from torch.utils.data import DataLoader
 
-from data.collate_fn import collate_fn_g, collate_fn_lg
-from data.data_config import DEFAULT_FLOATDTYPE
-from data.qm9_dataset import QM9Dataset
-from data.scaler import StandardScaler
-from graph.converter import Molecule2Graph
-from model.config import load_config
-from model.pl_wrapper import ScalarPredModule
-from script.train_utils import (
-    parse,
-    setup_data,
-    setup_model,
-    setup_trainer,
-    setup_wandb,
-)
+from eninet.data.collate_fn import collate_fn_g, collate_fn_lg
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
+from eninet.data.qm9_dataset import QM9Dataset
+from eninet.data.scaler import StandardScaler
+from eninet.graph.converter import Molecule2Graph
+from eninet.model.config import load_config
+from eninet.model.pl_wrapper import ScalarPredModule
+from eninet.script.train_utils import (parse, setup_data, setup_model, setup_trainer,
+                                setup_wandb)
 
 torch.set_default_dtype(DEFAULT_FLOATDTYPE)
 

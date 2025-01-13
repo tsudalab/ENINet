@@ -7,14 +7,16 @@ os.environ["DGLBACKEND"] = "pytorch"
 import os
 
 import numpy as np
-import torch
+from tqdm import tqdm
 from ase import Atoms
+
+import torch
 from dgl.data import DGLDataset
 from dgl.data.utils import _get_dgl_url, download, load_graphs, save_graphs
-from tqdm import tqdm
 
-from data.data_config import DEFAULT_FLOATDTYPE
-from graph.converter import Molecule2Graph
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
+from eninet.graph.converter import Molecule2Graph
+
 
 
 class QM9Dataset(DGLDataset):

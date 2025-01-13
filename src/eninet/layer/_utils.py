@@ -1,11 +1,4 @@
-import dgl
-import dgl.function as fn
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-from layer import CosineCutoff
-
+from torch import Tensor
 
 class EMA:
     def __init__(self, scale: float = 0.999):
@@ -16,7 +9,7 @@ class EMA:
     def scale(self):
         return self._scale
 
-    def apply(self, loss: torch.Tensor, phase: str):
+    def apply(self, loss: Tensor, phase: str):
         if phase not in self.ema:
             self.ema[phase] = loss.detach()
         else:

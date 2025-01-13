@@ -7,31 +7,43 @@ os.environ["DGLBACKEND"] = "pytorch"
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-import torch
+from tqdm import tqdm
 from ase import Atoms
+
+import torch
+from torch import Tensor
 from dgl import DGLGraph
 from dgl.data import DGLDataset
-from dgl.data.utils import _get_dgl_url, download, load_graphs, save_graphs
-from torch import Tensor
-from tqdm import tqdm
+from dgl.data.utils import load_graphs, save_graphs
 
-from data.data_config import DEFAULT_FLOATDTYPE
-from graph.converter import GraphConverter
+from eninet.graph.converter import GraphConverter
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
 
 
-class ASEDataset(DGLDataset):
+class CustomDatase(DGLDataset):
     def __init__(
         self,
         name: str,
         atoms: List[Atoms],
-        labels: Union[List[Tensor], Tensor],
+        labels: Union[List[Tensor], List[np.ndarray], List[float]],
         converter: GraphConverter,
         graph_filename: str,
         label_filename: str,
         linegraph_filename: Optional[str] = None,
     ) -> None:
         self.atoms = atoms
-        self.labels = torch.stack(labels) if isinstance(labels, list) else labels
+        if isinstance(labels, list):
+            if isinstance(labels[0], np.ndarray):
+                self.labels = torch.tensor(labels)
+            else:
+                self.labels = torch.stack(
+                    [
+                        torch.tensor(label) if isinstance(label, list) else label
+                        for label in labels
+                    ]
+                )
+        else:
+            self.labels = labels
         self.labels = self.labels.to(DEFAULT_FLOATDTYPE)
         self.converter = converter
         self.graph_filename = graph_filename

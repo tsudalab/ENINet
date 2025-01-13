@@ -7,7 +7,6 @@ data:
   n_workers: 1
   extensive: True
   file_savedir: ../tmp/graph_cache
-  label_norm: True
   train_size: 50
   val_size: 50
   test_size: null

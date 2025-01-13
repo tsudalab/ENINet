@@ -1,23 +1,21 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import pytorch_lightning as pl
 import torch
-from dgl import DGLGraph
 from torch import Tensor
 from torch.nn import Module
+from dgl import DGLGraph
 
-from data.scaler import BaseScaler
-from layer import (
-    EquivariantDipoleReadout,
-    EquivariantElectronicSpatialExtent,
-    EquivariantPolarizabilityReadout,
-    EquivariantScalarReadout,
-    ScalarReadout,
-)
-from layer._error import TensorPerAtomRMSE
-from layer._utils import EMA
-from model.model import EquiThreeBody
+from eninet.data.scaler import BaseScaler
+from eninet.layer import (EquivariantDipoleReadout,
+                   EquivariantElectronicSpatialExtent,
+                   EquivariantPolarizabilityReadout, EquivariantScalarReadout,
+                   ScalarReadout)
+from eninet.layer._error import TensorPerAtomRMSE
+from eninet.layer._utils import EMA
+from eninet.model.model import EquiThreeBody
+
 
 
 class BaseTrainModule(pl.LightningModule, metaclass=ABCMeta):

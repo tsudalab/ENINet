@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Optional
 
 import torch
 from torch import Tensor
 
-from data.data_config import DEFAULT_FLOATDTYPE
-
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
 
 class GaussianRBF(torch.nn.Module):
     """Expand interatomic distances with radial basis functions."""

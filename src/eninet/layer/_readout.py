@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import List
 
 import ase
-import dgl
-import numpy as np
-import torch
-from torch import Tensor, nn
-from torch.nn import functional as F
 
-from data.data_config import DEFAULT_FLOATDTYPE
+import dgl
+import torch
+from torch import nn
+
+from eninet.data.data_config import DEFAULT_FLOATDTYPE
 
 from . import MLP, GatedEquiBlock
 
