@@ -54,8 +54,8 @@ To prepare a custom dataset, save it as a JSON file with the following structure
 ```json
 {
   "mol_id": {
-    "structure": <structure>,
-    "label": <label>
+    "structure": structure_dict,
+    "label": float
   }
 }
 ```
