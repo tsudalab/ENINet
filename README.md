@@ -51,11 +51,11 @@ python train_qm7b.py --config configs/qm7b-example.yaml
 
 To prepare a custom dataset, save it as a JSON file with the following structure:
 
-```json
+```
 {
   "mol_id": {
-    "structure": structure_dict,
-    "label": float
+    "structure": <structure>,
+    "label": <label>
   }
 }
 ```
