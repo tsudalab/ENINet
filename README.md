@@ -36,7 +36,7 @@ pip install -e .
 
 You can test the installation by running the following command:
 
-```python
+```
 python tests/test_equivariance.py
 ```
 
